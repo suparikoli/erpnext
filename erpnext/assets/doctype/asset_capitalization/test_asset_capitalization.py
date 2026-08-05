@@ -340,6 +340,93 @@ class TestAssetCapitalization(unittest.TestCase):
 		self.assertFalse(get_actual_gle_dict(asset_capitalization.name))
 		self.assertFalse(get_actual_sle_dict(asset_capitalization.name))
 
+<<<<<<< HEAD
+=======
+	def test_capitalize_composite_component(self):
+		company = "_Test Company with perpetual inventory"
+		set_depreciation_settings_in_company(company=company)
+		name = frappe.db.get_value(
+			"Asset Category Account",
+			filters={"parent": "Computers", "company_name": company},
+			fieldname=["name"],
+		)
+		frappe.db.set_value("Asset Category Account", name, "capital_work_in_progress_account", "")
+
+		wip_composite_asset = create_asset(
+			asset_name="Asset Capitalization WIP Composite Asset",
+			asset_type="Composite Asset",
+			warehouse="Stores - TCP1",
+			company=company,
+		)
+
+		consumed_asset_value = 100000
+
+		item = create_fixed_asset_item("Asset Capitalization Consumable Asset")
+
+		pr = make_purchase_receipt(
+			item_code=item.item_code,
+			qty=1,
+			rate=consumed_asset_value,
+			company=company,
+			warehouse="Stores - TCP1",
+		)
+		consumed_asset_name = frappe.db.get_value("Asset", {"purchase_receipt": pr.name}, "name")
+		consumed_asset_doc = frappe.get_doc("Asset", consumed_asset_name)
+
+		consumed_asset_doc.update(
+			{
+				"asset_type": "Composite Component",
+				"purchase_date": pr.posting_date,
+				"available_for_use_date": pr.posting_date,
+				"location": "Test Location",
+			}
+		)
+		consumed_asset_doc.save()
+		consumed_asset_doc.submit()
+
+		# Create and submit Asset Captitalization
+		asset_capitalization = create_asset_capitalization(
+			target_asset=wip_composite_asset.name,
+			target_asset_location="Test Location",
+			consumed_asset=consumed_asset_doc.name,
+			company=company,
+			submit=1,
+		)
+
+		# Test Asset Capitalization values
+		self.assertEqual(asset_capitalization.asset_items[0].asset_value, consumed_asset_value)
+
+		actual_gle = get_actual_gle_dict(asset_capitalization.name)
+		self.assertEqual(actual_gle, {})
+
+	def test_grouped_stock_item_rows_split_fifo_rate(self):
+		from erpnext.stock.doctype.warehouse.test_warehouse import create_warehouse
+
+		company = "_Test Company"
+		warehouse = create_warehouse("_Test Warehouse for Grouped FIFO Rows", company=company)
+		item = create_item(
+			"_Test Grouped FIFO Rows Item", is_stock_item=1, is_fixed_asset=0, is_purchase_item=1
+		)
+		target_item = create_fixed_asset_item("_Test Grouped FIFO Rows Target Item")
+
+		make_purchase_receipt(item_code=item.item_code, qty=1, rate=100, company=company, warehouse=warehouse)
+		make_purchase_receipt(item_code=item.item_code, qty=1, rate=200, company=company, warehouse=warehouse)
+
+		asset_capitalization = frappe.new_doc("Asset Capitalization")
+		asset_capitalization.company = company
+		asset_capitalization.target_item_code = target_item.name
+		asset_capitalization.append(
+			"stock_items", {"item_code": item.item_code, "warehouse": warehouse, "stock_qty": 1}
+		)
+		asset_capitalization.append(
+			"stock_items", {"item_code": item.item_code, "warehouse": warehouse, "stock_qty": 1}
+		)
+		asset_capitalization.insert()
+
+		rates = [d.valuation_rate for d in asset_capitalization.stock_items]
+		self.assertEqual(rates, [100, 200])
+
+>>>>>>> 2cbc5b89d6 (test(assets): cover grouped stock item rows splitting FIFO rate)
 
 def create_asset_capitalization_data():
 	create_item("Capitalization Target Stock Item", is_stock_item=1, is_fixed_asset=0, is_purchase_item=0)
