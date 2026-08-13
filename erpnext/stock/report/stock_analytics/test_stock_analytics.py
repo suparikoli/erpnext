@@ -7,7 +7,11 @@ from frappe.utils.data import add_to_date, getdate
 from erpnext.accounts.utils import get_fiscal_year
 from erpnext.stock.doctype.item.test_item import make_item
 from erpnext.stock.doctype.stock_entry.stock_entry_utils import make_stock_entry
-from erpnext.stock.report.stock_analytics.stock_analytics import execute, get_period_date_ranges
+from erpnext.stock.report.stock_analytics.stock_analytics import (
+	execute,
+	get_period,
+	get_period_date_ranges,
+)
 from erpnext.tests.utils import ERPNextTestSuite
 
 
@@ -77,6 +81,21 @@ class TestStockAnalyticsReport(ERPNextTestSuite):
 		]
 
 		self.assertEqual(ranges, expected_ranges)
+
+	def test_get_period_yearly_uses_fiscal_year_name(self):
+		"""A Yearly period is labelled by fiscal year NAME, like every other range.
+
+		get_fiscal_year returns (name, year_start_date, year_end_date). This branch
+		previously used index 2, so a Yearly column was headed with the year end
+		date ("2025-03-31") instead of the fiscal year ("2024-2025").
+		"""
+		filters = _dict(range="Yearly", company=None)
+		fiscal_year = get_fiscal_year("2021-01-28")
+
+		period = get_period(getdate("2021-01-28"), filters)
+
+		self.assertEqual(period, fiscal_year[0])
+		self.assertNotEqual(period, str(fiscal_year[2]))
 
 	def test_basic_report_functionality(self):
 		"""Stock analytics report generates balance "as of" periods based on
